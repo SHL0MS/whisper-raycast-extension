@@ -186,12 +186,21 @@ export default function SimpleDictateCommand() {
     }
   }, [state]);
 
+  // Track when the current recording started, so the waveform header
+  // can show elapsed time. Reset whenever recording stops.
+  const recordingStartTimeRef = useRef<number | null>(null);
+
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
     if (state === "recording") {
+      if (recordingStartTimeRef.current === null) {
+        recordingStartTimeRef.current = Date.now();
+      }
       intervalId = setInterval(() => {
         setWaveformSeed((prev) => prev + 1);
       }, 150);
+    } else {
+      recordingStartTimeRef.current = null;
     }
     return () => {
       if (intervalId) {
@@ -250,7 +259,13 @@ export default function SimpleDictateCommand() {
 
   const generateWaveformMarkdown = useCallback(() => {
     const waveformHeight = 18;
-    const header = waveformWidth >= 40 ? "RECORDING AUDIO... PRESS ENTER TO STOP" : "RECORDING (Enter to stop)";
+    const elapsedMs = recordingStartTimeRef.current ? Date.now() - recordingStartTimeRef.current : 0;
+    const totalSec = Math.floor(elapsedMs / 1000);
+    const elapsedStr = `${Math.floor(totalSec / 60)}:${(totalSec % 60).toString().padStart(2, "0")}`;
+    const header =
+      waveformWidth >= 40
+        ? `RECORDING AUDIO  •  ${elapsedStr}  •  PRESS ENTER TO STOP`
+        : `REC ${elapsedStr} (Enter to stop)`;
     let waveform = "```\n" + header + "\n\n";
 
     // Compute the time-varying normalized amplitude per column once per frame,
